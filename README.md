@@ -1,498 +1,637 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <style>
-        body { margin: 0; overflow: hidden; background: black; }
-        canvas { display: block; }
-        #hud {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 320px;
-            color: #00ffcc;
-            font-family: monospace;
-            font-size: 13px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 10;
-            text-align: center;
-            opacity: 0; /* 초기 숨김 */
-            transition: opacity 1s ease-in-out;
-        }
-        #hud-version {
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        #hud-video {
-            margin-top: 10px;
-            width: 240px;
-            height: 135px;
-            border: 1px solid #00ffcc;
-            object-fit: cover;
-        }
-        #hud-answer {
-            margin-top: 5px;
-            padding: 5px;
-            border: 1px solid #00ffcc;
-            min-height: 90px;
-        }
-        #hud-orbit {
-            margin-top: 5px;
-            padding: 5px;
-            border: 1px solid #00ffcc;
-        }
-        #chat {
-            position: absolute;
-            top: 100px;
-            right: 20px;
-            width: 340px;
-            height: 500px;
-            background: rgba(0, 0, 0, 0.85);
-            color: #00ffcc;
-            font-family: monospace;
-            font-size: 14px;
-            padding: 15px;
-            border-radius: 8px;
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            transition: width 0.5s ease, height 0.5s ease, transform 0.5s ease, opacity 0.5s ease; /* 크기 전환 애니메이션 */
-            box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
-        }
-        #chat.expanded {
-            width: 500px; /* 확대 시 너비 */
-            height: 700px; /* 확대 시 높이 */
-        }
-        .alert {
-            transform: translateY(0);
-            opacity: 1;
-            animation: ring 0.5s ease;
-        }
-        .minimized {
-            transform: translateY(-50px);
-            opacity: 0.5;
-        }
-        @keyframes ring {
-            0% { transform: translateY(0); }
-            25% { transform: translateY(-5px); }
-            50% { transform: translateY(0); }
-            75% { transform: translateY(-5px); }
-            100% { transform: translateY(0); }
-        }
-        #messages {
-            flex: 1;
-            overflow-y: auto;
-            margin-bottom: 10px;
-        }
-        #messages div {
-            text-shadow: 0 0 3px rgba(0, 255, 204, 0.5);
-            margin-bottom: 5px;
-        }
-        #chat-input {
-            width: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            border: 1px solid #00ffcc;
-            color: #00ffcc;
-            padding: 8px;
-            font-family: monospace;
-            font-size: 14px;
-            box-shadow: inset 0 0 5px rgba(0, 255, 204, 0.2);
-            margin-top: 10px;
-        }
-        #command-guide {
-            margin-top: 10px;
-            font-size: 12px;
-            color: #66ff99;
-            border-top: 1px solid #00ffcc;
-            padding-top: 5px;
-        }
-        #intro-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, 100%);
-            color: #00ffcc;
-            font-family: monospace;
-            font-size: 48px;
-            font-weight: bold;
-            text-align: center;
-            z-index: 20;
-            animation: riseUp 2s ease-out forwards;
-        }
-        @keyframes riseUp {
-            0% {
-                transform: translate(-50%, 100%);
-                opacity: 0;
-            }
-            50% {
-                transform: translate(-50%, -50%);
-                opacity: 1;
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(0.3);
-                opacity: 0;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>3D 캐릭터 HUD 인터페이스 & 달력 & 이메일 알림</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; overflow: hidden; }
+    /* 오른쪽 HUD: 채팅창 + 이메일 알림 */
+    #right-hud {
+      position: absolute; top: 10px; right: 10px; padding: 10px;
+      background: rgba(255,255,255,0.8); border-radius: 5px; z-index: 20;
+      width: 300px;
+    }
+    /* 왼쪽 HUD: 달력 UI */
+    #left-hud {
+      position: absolute; top: 10px; left: 10px; padding: 10px;
+      background: rgba(255,255,255,0.9); border-radius: 5px; z-index: 20;
+      width: 320px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    /* 달력 UI 스타일 */
+    #calendar-container { margin-top: 10px; }
+    #calendar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    #calendar-header button {
+      padding: 2px 6px;
+      font-size: 12px;
+    }
+    #month-year-label {
+      font-weight: bold;
+      font-size: 14px;
+    }
+    #year-select {
+      font-size: 12px;
+      padding: 2px;
+      margin-left: 5px;
+    }
+    #calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+    }
+    #calendar-grid div {
+      border: 1px solid #ccc;
+      min-height: 40px;
+      font-size: 12px;
+      padding: 2px;
+      position: relative;
+      cursor: pointer;
+    }
+    #calendar-grid div:hover { background: #f0f0f0; }
+    .day-number {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      font-weight: bold;
+    }
+    .event {
+      margin-top: 18px;
+      font-size: 10px;
+      color: #333;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    /* 말풍선 */
+    #speech-bubble {
+      position: absolute; background: white; padding: 5px 10px;
+      border-radius: 10px; font-size: 12px; display: none; z-index: 30;
+      white-space: pre-line;
+    }
+    /* 채팅 로그 */
+    #chat-log {
+      height: 100px; overflow-y: scroll; border: 1px solid #ccc;
+      padding: 5px; margin-top: 10px;
+    }
+    /* 3D 캔버스 */
+    #canvas { position: absolute; width: 100%; height: 100%; z-index: 1; }
+  </style>
+  
+  <!-- EmailJS 라이브러리 (프론트엔드에서 이메일 전송용) -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+  <script type="text/javascript">
+    // EmailJS 초기화 – Public Key (여기서는 "3YFtNo1im0qkWpUDE" 사용)
+    (function() {
+      emailjs.init("3YFtNo1im0qkWpUDE");
+    })();
+
+    // 사용자가 입력한 이메일 주소로 알림 메일 전송 함수
+    function sendEmailPush() {
+      const userEmail = document.getElementById('user-email').value.trim();
+      if (!userEmail) {
+        alert("이메일 주소를 입력해주세요.");
+        return;
+      }
+      const templateParams = {
+        to_email: userEmail,
+        subject: "푸시 알림",
+        message: "이것은 프론트엔드에서 전송한 이메일 알림입니다."
+      };
+      emailjs.send("service_vrwj82e", "template_612ljjp", templateParams)
+        .then(function(response) {
+          alert("이메일이 전송되었습니다!");
+        }, function(error) {
+          alert("이메일 전송에 실패했습니다: " + JSON.stringify(error));
+        });
+    }
+  </script>
 </head>
 <body>
-<div id="hud">
-    <div id="hud-version"></div>
-    ☀️ 정보:<br>
-    <video id="hud-video" autoplay loop muted>
-        <source id="hud-source" src="https://videos.pexels.com/video-files/5921369/5921369-hd_1920_1080_30fps.mp4" type="video/mp4">
-    </video>
-    <div id="hud-answer">명령 또는 질문을 입력하세요.</div>
-    <div id="hud-orbit">궤도 반지름: <span id="orbit-value"></span> AU | 속도: <span id="speed-value"></span> km/s</div>
-</div>
-
-<div id="chat" class="minimized">
-    <div id="messages"></div>
-    <input type="text" id="chat-input" placeholder="Enter로 메시지 입력">
-    <div id="command-guide">
-        📝 명령어 입력 방법:<br>
-        - "태양으로 가게": 태양으로 이동<br>
-        - "지구로 가게" 또는 "지구로 귀환": 지구로 이동<br>
-        - "태양 알려줘": 태양 정보 확인<br>
-        - "지구 알려줘": 지구 정보 확인<br>
-        - "확대 해줘": 채팅창을 확대합니다 (500px x 700px)<br>
-        - "축소 해줘": 채팅창을 원래 크기로 축소합니다 (340px x 500px)<br>
-        <br>
-        📖 시스템 상세 설명:<br>
-        - **제작 방식**: 이 시스템은 Three.js 라이브러리를 기반으로 3D 객체(태양, 지구, 인공위성)를 렌더링하며, JavaScript로 동적 애니메이션과 상호작용을 구현했습니다. HTML5 Video 요소를 활용해 비디오 텍스처를 적용했습니다.<br>
-        - **UI 기반 여부**: UI는 완전한 UI 프레임워크(예: React, Vue) 없이 순수 HTML/CSS/JavaScript로 제작되었으며, HUD와 채팅창은 정적 레이아웃으로 구성되어 있습니다. 3D 시각화는 UI와 분리되어 Three.js에서 관리됩니다.<br>
-        - **목적**: 실시간 위성 시뮬레이션을 통해 태양계 탐사를 시각화하고, 사용자가 명령어를 통해 상호작용할 수 있도록 설계되었습니다.<br>
-        - **확대 기능 설명**: "확대 해줘" 명령어로 채팅창 크기를 늘려 더 많은 메시지를 확인할 수 있으며, "축소 해줘"로 원래 크기로 되돌릴 수 있습니다. 크기 전환은 부드러운 애니메이션으로 진행됩니다.
+  <!-- 오른쪽 HUD: 채팅창 및 이메일 알림 입력 -->
+  <div id="right-hud">
+    <h3>채팅창</h3>
+    <div id="chat-log"></div>
+    <input type="text" id="chat-input" placeholder="채팅 입력..." />
+    <br/><br/>
+    <!-- 이메일 알림 전송 입력 필드와 버튼 -->
+    <input type="email" id="user-email" placeholder="이메일 주소 입력" style="width: 100%; padding: 5px; margin-bottom: 5px;" />
+    <button onclick="sendEmailPush()" style="width: 100%; padding: 5px;">이메일 알림 보내기</button>
+  </div>
+  
+  <!-- 왼쪽 HUD: 달력 UI -->
+  <div id="left-hud">
+    <h3>캘린더</h3>
+    <div id="calendar-container">
+      <div id="calendar-header">
+        <button id="prev-month">◀</button>
+        <span id="month-year-label"></span>
+        <button id="next-month">▶</button>
+        <select id="year-select"></select>
+      </div>
+      <div id="calendar-grid"></div>
     </div>
-</div>
-
-<!-- 알림 소리 -->
-<audio id="notificationSound" src="https://www.soundjay.com/buttons/beep-01a.mp3" preload="auto"></audio>
-
-<div id="intro-text">A.S.H. v0.1</div>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-<script>
-    // Three.js 기본 설정
+  </div>
+  
+  <!-- 말풍선 (3D 캐릭터 말풍선) -->
+  <div id="speech-bubble"></div>
+  <!-- 3D 캔버스 -->
+  <canvas id="canvas"></canvas>
+  
+  <!-- Three.js 라이브러리 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script>
+    /* ====================================
+       3D 씬 설정 (캐릭터, 배경, 날씨 효과 등)
+    ==================================== */
+    let currentWeather = "";
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const loader = new THREE.TextureLoader();
-
-    // 태양 구체
-    const sunTexture = loader.load('https://images.pexels.com/photos/87611/sun-fireball-solar-flare-sunlight-87611.jpeg');
-    const sunGeo = new THREE.SphereGeometry(1.5, 64, 64);
-    const sunMat = new THREE.MeshStandardMaterial({ map: sunTexture });
-    const sun = new THREE.Mesh(sunGeo, sunMat);
+    camera.position.set(5, 5, 10);
+    camera.lookAt(0, 0, 0);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 10, 7).normalize();
+    scene.add(directionalLight);
+    scene.add(new THREE.AmbientLight(0x333333));
+    
+    // 태양 객체
+    const sunMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xff9900, transparent: true, opacity: 0 });
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(1.5, 64, 64), sunMaterial);
     scene.add(sun);
-
-    // 지구(MP4 비디오)
-    const earthVideo = document.createElement('video');
-    earthVideo.src = 'https://videos.pexels.com/video-files/5921369/5921369-hd_1920_1080_30fps.mp4';
-    earthVideo.crossOrigin = 'anonymous';
-    earthVideo.loop = true;
-    earthVideo.muted = true;
-    earthVideo.play();
-    const earthVideoTexture = new THREE.VideoTexture(earthVideo);
-    const earthGeo = new THREE.SphereGeometry(0.5, 64, 64);
-    const earthMat = new THREE.MeshStandardMaterial({ map: earthVideoTexture });
-    const earth = new THREE.Mesh(earthGeo, earthMat);
-    scene.add(earth);
-
-    // 인공위성(MP4 비디오)
-    const satelliteVideo = document.createElement('video');
-    satelliteVideo.src = 'https://videos.pexels.com/video-files/854277/854277-hd_1280_720_30fps.mp4';
-    satelliteVideo.crossOrigin = 'anonymous';
-    satelliteVideo.loop = true;
-    satelliteVideo.muted = true;
-    satelliteVideo.play().catch(error => {
-        console.error('Satellite video playback failed:', error);
-        alert('인공위성 비디오 로드에 실패했습니다. CORS 문제일 가능성이 있습니다. 로컬 파일로 대체해 주세요.');
-    });
-    const satelliteVideoTexture = new THREE.VideoTexture(satelliteVideo);
-    satelliteVideoTexture.minFilter = THREE.LinearFilter;
-    satelliteVideoTexture.magFilter = THREE.LinearFilter;
-    satelliteVideoTexture.format = THREE.RGBFormat;
-
-    const satelliteGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-    const satelliteMat = new THREE.MeshStandardMaterial({ map: satelliteVideoTexture });
-    const satellite = new THREE.Group();
-    const body = new THREE.Mesh(satelliteGeo, satelliteMat);
-    satellite.add(body);
-
-    const panelL = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.3), new THREE.MeshStandardMaterial({ color: 0x666699, metalness: 0.2 }));
-    panelL.position.x = -0.6;
-    panelL.rotation.y = Math.PI / 15;
-    const panelR = panelL.clone();
-    panelR.position.x = 0.6;
-    panelR.rotation.y = -Math.PI / 15;
-    satellite.add(panelL);
-    satellite.add(panelR);
-    scene.add(satellite);
-
-    const fallbackTexture = loader.load('https://images.pexels.com/photos/23789/pexels-photo.jpg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2');
-    satelliteVideo.addEventListener('error', () => {
-        console.warn('인공위성 비디오 로드 실패, 대체 텍스처로 전환');
-        satelliteMat.map = fallbackTexture;
-        satelliteMat.needsUpdate = true;
-    });
-
-    const light = new THREE.PointLight(0xffffff, 2);
-    light.position.set(10, 10, 10);
-    scene.add(light);
-
-    camera.position.z = 12;
-
-    let satelliteMode = "orbit";
-    let angleEarth = 0;
-    let angleSatellite = 0;
-    const earthOrbitRadius = 5;
-    let satelliteOrbitRadius = 1.2;
-    const satelliteSpeed = 0.05;
-    let sensorRotation = 0;
-    let sensorRotating = false;
-    let lastTimeUpdate = 0;
-    const timeUpdateInterval = 60000;
-
-    function toggleChatAlert(message) {
-        const chatBox = document.getElementById('chat');
-        const notificationSound = document.getElementById('notificationSound');
-        chatBox.classList.add('alert');
-        chatBox.classList.remove('minimized');
-        notificationSound.play();
-        const messages = document.getElementById('messages');
-        messages.innerHTML += `<div style="color: #ff0;">📢 ${message || '채팅창 입력하세요!'}</div>`;
-        messages.scrollTop = messages.scrollHeight;
+    // 달 객체
+    const moonMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, emissive: 0x222222, transparent: true, opacity: 1 });
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(1.2, 64, 64), moonMaterial);
+    scene.add(moon);
+    
+    // 별, 반딧불 생성
+    const stars = [], fireflies = [];
+    for (let i = 0; i < 100; i++) {
+      const star = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      star.position.set((Math.random()-0.5)*50, (Math.random()-0.5)*30, -10);
+      scene.add(star);
+      stars.push(star);
+    }
+    for (let i = 0; i < 30; i++) {
+      const firefly = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffff99 }));
+      firefly.position.set((Math.random()-0.5)*20, (Math.random()-0.5)*10, -5);
+      scene.add(firefly);
+      fireflies.push(firefly);
+    }
+    
+    // 고해상도 콩크리트 바닥 (Y = -2)
+    const floorGeometry = new THREE.PlaneGeometry(200, 200, 128, 128);
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 1, metalness: 0 });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI/2;
+    floor.position.y = -2;
+    scene.add(floor);
+    
+    // 배경 그룹 (빌딩, 집, 가로등) – 고정된 위치에 배치
+    const backgroundGroup = new THREE.Group();
+    scene.add(backgroundGroup);
+    function createBuilding(width, height, depth, color) {
+      const geometry = new THREE.BoxGeometry(width, height, depth);
+      const material = new THREE.MeshStandardMaterial({ color: color, roughness: 0.7, metalness: 0.1 });
+      return new THREE.Mesh(geometry, material);
+    }
+    function createHouse(width, height, depth, baseColor, roofColor) {
+      const houseGroup = new THREE.Group();
+      const base = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth),
+                                  new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.8 }));
+      base.position.y = -2 + height/2;
+      houseGroup.add(base);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(width * 0.8, height * 0.6, 4),
+                                  new THREE.MeshStandardMaterial({ color: roofColor, roughness: 0.8 }));
+      roof.position.y = -2 + height + (height * 0.6)/2;
+      roof.rotation.y = Math.PI/4;
+      houseGroup.add(roof);
+      return houseGroup;
+    }
+    // 빌딩 배치 (5열×2행)
+    for (let i = 0; i < 10; i++) {
+      const width = Math.random() * 2 + 2;
+      const height = Math.random() * 10 + 10;
+      const depth = Math.random() * 2 + 2;
+      const building = createBuilding(width, height, depth, 0x555555);
+      const col = i % 5;
+      const row = Math.floor(i / 5);
+      const x = -20 + col * 10;
+      const z = -15 - row * 10;
+      building.position.set(x, -2 + height/2, z);
+      backgroundGroup.add(building);
+    }
+    // 집 배치 (1행, 캐릭터 뒤쪽, Z = -5)
+    for (let i = 0; i < 5; i++) {
+      const width = Math.random() * 2 + 3;
+      const height = Math.random() * 2 + 3;
+      const depth = Math.random() * 2 + 3;
+      const house = createHouse(width, height, depth, 0xa0522d, 0x8b0000);
+      const x = -10 + i * 10;
+      const z = -5;
+      house.position.set(x, 0, z);
+      backgroundGroup.add(house);
+    }
+    
+    // 단일 가로등: 캐릭터 바로 옆에 배치 (바닥 고정)
+    function createStreetlight() {
+      const lightGroup = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4, 8),
+                                    new THREE.MeshBasicMaterial({ color: 0x333333 }));
+      pole.position.y = 2;
+      lightGroup.add(pole);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8),
+                                    new THREE.MeshBasicMaterial({ color: 0xffcc00 }));
+      lamp.position.y = 4.2;
+      lightGroup.add(lamp);
+      const lampLight = new THREE.PointLight(0xffcc00, 1, 10);
+      lampLight.position.set(0, 4.2, 0);
+      lightGroup.add(lampLight);
+      return lightGroup;
+    }
+    const characterStreetlight = createStreetlight();
+    characterStreetlight.position.set(1, -2, 0);
+    scene.add(characterStreetlight);
+    
+    // 날씨 효과 – 비
+    let rainGroup = new THREE.Group();
+    scene.add(rainGroup);
+    function initRain() {
+      const rainCount = 1000;
+      const rainGeometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(rainCount * 3);
+      for (let i = 0; i < rainCount; i++) {
+        positions[i * 3] = Math.random() * 100 - 50;
+        positions[i * 3 + 1] = Math.random() * 50;
+        positions[i * 3 + 2] = Math.random() * 100 - 50;
+      }
+      rainGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const rainMaterial = new THREE.PointsMaterial({ color: 0xaaaaee, size: 0.1, transparent: true, opacity: 0.6 });
+      const rainParticles = new THREE.Points(rainGeometry, rainMaterial);
+      rainGroup.add(rainParticles);
+    }
+    initRain();
+    rainGroup.visible = false;
+    
+    // 날씨 효과 – 구름 (단 하나의 고해상도 구름, 집 위에 고정, 앞으로 이동 애니메이션)
+    let houseCloudGroup = new THREE.Group();
+    function createHouseCloud() {
+      const cloud = new THREE.Group();
+      const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+      const sphere1 = new THREE.Mesh(new THREE.SphereGeometry(2, 32, 32), cloudMat);
+      sphere1.position.set(0, 0, 0);
+      const sphere2 = new THREE.Mesh(new THREE.SphereGeometry(1.8, 32, 32), cloudMat);
+      sphere2.position.set(2.2, 0.7, 0);
+      const sphere3 = new THREE.Mesh(new THREE.SphereGeometry(2.1, 32, 32), cloudMat);
+      sphere3.position.set(-2.2, 0.5, 0);
+      cloud.add(sphere1, sphere2, sphere3);
+      cloud.userData.initialPos = cloud.position.clone();
+      return cloud;
+    }
+    const singleCloud = createHouseCloud();
+    houseCloudGroup.add(singleCloud);
+    houseCloudGroup.position.set(0, 5, -10);
+    scene.add(houseCloudGroup);
+    function updateHouseClouds() {
+      singleCloud.position.x += 0.02;
+      if (singleCloud.position.x > 5) { singleCloud.position.x = -5; }
+    }
+    
+    // 날씨 효과 – 번개
+    let lightningLight = new THREE.PointLight(0xffffff, 0, 500);
+    lightningLight.position.set(0, 50, 0);
+    scene.add(lightningLight);
+    function updateWeatherEffects() {
+      if (currentWeather.indexOf("비") !== -1 || currentWeather.indexOf("소나기") !== -1) {
+        rainGroup.visible = true;
+      } else {
+        rainGroup.visible = false;
+      }
+      if (currentWeather.indexOf("구름") !== -1) {
+        houseCloudGroup.visible = true;
+      } else {
+        houseCloudGroup.visible = false;
+      }
+    }
+    
+    // 캐릭터 생성
+    const characterGroup = new THREE.Group();
+    const charBody = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1.5, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x00cc66 })
+    );
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffcc66 })
+    );
+    head.position.y = 1.2;
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), eyeMat);
+    const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), eyeMat);
+    leftEye.position.set(-0.2, 1.3, 0.45);
+    rightEye.position.set(0.2, 1.3, 0.45);
+    const mouth = new THREE.Mesh(
+      new THREE.BoxGeometry(0.2, 0.05, 0.05),
+      new THREE.MeshStandardMaterial({ color: 0xff3366 })
+    );
+    mouth.position.set(0, 1.1, 0.51);
+    const leftBrow = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.05), eyeMat);
+    const rightBrow = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.05), eyeMat);
+    leftBrow.position.set(-0.2, 1.45, 0.45);
+    rightBrow.position.set(0.2, 1.45, 0.45);
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1, 0.2), charBody.material);
+    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1, 0.2), charBody.material);
+    leftArm.position.set(-0.7, 0.4, 0);
+    rightArm.position.set(0.7, 0.4, 0);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x3366cc });
+    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1, 0.3), legMat);
+    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1, 0.3), legMat);
+    leftLeg.position.set(-0.35, -1, 0);
+    rightLeg.position.set(0.35, -1, 0);
+    characterGroup.add(charBody, head, leftEye, rightEye, mouth, leftBrow, rightBrow, leftArm, rightArm, leftLeg, rightLeg);
+    // 캐릭터는 머리와 바닥 사이 간격 유지를 위해 Y = -1
+    characterGroup.position.y = -1;
+    scene.add(characterGroup);
+    
+    const characterLight = new THREE.PointLight(0xffee88, 1, 15);
+    scene.add(characterLight);
+    
+    // 말풍선 관련 함수
+    const bubble = document.getElementById('speech-bubble');
+    function updateBubblePosition() {
+      const headPos = new THREE.Vector3();
+      head.getWorldPosition(headPos);
+      const screenPos = headPos.project(camera);
+      bubble.style.left = `${(screenPos.x * 0.5 + 0.5) * window.innerWidth}px`;
+      bubble.style.top = `${(1 - (screenPos.y * 0.5 + 0.5)) * window.innerHeight - 50}px`;
+    }
+    function showSpeechBubbleInChunks(text, chunkSize = 15, delay = 3000) {
+      const chunks = [];
+      for (let i = 0; i < text.length; i += chunkSize) {
+        chunks.push(text.slice(i, i + chunkSize));
+      }
+      let index = 0;
+      function showNextChunk() {
+        if (index < chunks.length) {
+          bubble.textContent = chunks[index];
+          bubble.style.display = 'block';
+          index++;
+          setTimeout(showNextChunk, delay);
+        } else {
+          setTimeout(() => bubble.style.display = 'none', 3000);
+        }
+      }
+      showNextChunk();
+    }
+    
+    // 채팅 전송 및 캐릭터 말풍선 출력
+    async function sendChat() {
+      const input = document.getElementById('chat-input').value.trim();
+      let response = "";
+      const lowerInput = input.toLowerCase();
+      
+      if (lowerInput.includes("안녕")) {
+        response = "안녕하세요, 주인님! 오늘 기분은 어떠세요?";
+        characterGroup.children[7].rotation.z = Math.PI/4;
+        setTimeout(() => { characterGroup.children[7].rotation.z = 0; }, 1000);
+      }
+      else if (lowerInput.includes("캐릭터 넌 누구야")) {
+        response = "저는 당신의 개인 비서에요 😁";
+      }
+      else if (lowerInput.includes("일정")) {
+        response = "캘린더는 좌측에서 확인하세요.";
+      }
+      else if (lowerInput.includes("날씨") && (lowerInput.includes("알려") || lowerInput.includes("어때"))) {
+        const weather = await getWeather();
+        response = `현재 날씨는 ${weather}입니다.`;
+      }
+      else if (lowerInput.includes("캐릭터 춤춰줘")) {
+        response = "춤출게요!";
+        const danceInterval = setInterval(() => {
+          characterGroup.children[7].rotation.z = Math.sin(Date.now() * 0.01) * Math.PI/4;
+          head.rotation.y = Math.sin(Date.now() * 0.01) * Math.PI/8;
+        }, 50);
         setTimeout(() => {
-            chatBox.classList.remove('alert');
-            chatBox.classList.add('minimized');
-            setTimeout(() => {
-                const alertMsg = messages.getElementsByTagName('div')[messages.getElementsByTagName('div').length - 1];
-                if (alertMsg && alertMsg.textContent.includes('채팅창 입력하세요') || alertMsg && alertMsg.textContent.includes('현재 시간') || alertMsg && alertMsg.textContent.includes('인공위성 상태')) {
-                    alertMsg.remove();
-                }
-            }, 2000);
-        }, 2000);
+          clearInterval(danceInterval);
+          characterGroup.children[7].rotation.z = 0;
+          head.rotation.y = 0;
+        }, 3000);
+      }
+      else {
+        response = "죄송해요, 잘 이해하지 못했어요. 다시 한 번 말씀해주시겠어요?";
+      }
+      
+      showSpeechBubbleInChunks(response);
+      document.getElementById('chat-input').value = '';
     }
-
-    function checkSatelliteStatus() {
-        const randomFactor = Math.random();
-        const isStableOrbit = satelliteOrbitRadius > 1.0 && satelliteOrbitRadius < 1.5;
-        const isNormalSpeed = satelliteSpeed === 0.05;
-        let statusMessage;
-
-        if (randomFactor < 0.3 || !isStableOrbit || !isNormalSpeed) {
-            statusMessage = `⚠️ 인공위성 상태: 안양호입니다! 궤도나 속도에 이상이 있을 수 있어요. 점검을 권장합니다.`;
-        } else {
-            statusMessage = `✅ 인공위성 상태: 양호입니다! 현재 궤도와 속도가 정상이에요.`;
-        }
-
-        return statusMessage;
-    }
-
-    function updateSatelliteTime() {
-        const currentTime = performance.now();
-        if (currentTime - lastTimeUpdate >= timeUpdateInterval) {
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const timeMessage = `🕒 인공위성 현재 시간: ${hours}시 ${minutes}분 ${seconds}초 (2025-03-19 기준)`;
-            const statusMessage = checkSatelliteStatus();
-
-            sendChat(timeMessage);
-            sendChat(statusMessage);
-            toggleChatAlert(timeMessage + "\n" + statusMessage);
-            lastTimeUpdate = currentTime;
-        }
-    }
-
-    document.getElementById('chat-input').addEventListener('keypress', function(event) {
-        if (event.key === 'Enter') {
-            const input = document.getElementById('chat-input');
-            const msg = input.value.trim();
-            if (msg) {
-                sendChat(`👨‍🚀 ${msg}`);
-                toggleChatAlert(`👨‍🚀 ${msg}`);
-
-                if (msg.includes("태양으로 가게")) {
-                    satelliteMode = "toSun";
-                    sendChat(`🛰 위성이 태양으로 이동합니다!`);
-                    toggleChatAlert(`🛰 위성이 태양으로 이동합니다!`);
-                } else if (msg.includes("지구로 가게") || msg.includes("지구로 귀환")) {
-                    satelliteMode = "toEarth";
-                    sendChat(`🛰 위성이 지구로 이동합니다!`);
-                    toggleChatAlert(`🛰 위성이 지구로 이동합니다!`);
-                } else if (msg.includes("태양 알려줘")) {
-                    autoSunInfo();
-                } else if (msg.includes("지구 알려줘")) {
-                    autoEarthInfo();
-                } else if (msg.includes("확대 해줘")) {
-                    toggleChatSize(true);
-                    sendChat(`📏 채팅창이 확대되었습니다!`);
-                    toggleChatAlert(`📏 채팅창이 확대되었습니다!`);
-                } else if (msg.includes("축소 해줘")) {
-                    toggleChatSize(false);
-                    sendChat(`📏 채팅창이 축소되었습니다!`);
-                    toggleChatAlert(`📏 채팅창이 축소되었습니다!`);
-                } else {
-                    sendChat(`🤖 명령어를 인식하지 못했습니다.`);
-                    toggleChatAlert(`🤖 명령어를 인식하지 못했습니다.`);
-                }
-                input.value = "";
-            }
-        }
+    
+    document.getElementById('chat-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { sendChat(); }
     });
-
-    function toggleChatSize(expand) {
-        const chat = document.getElementById('chat');
-        if (expand) {
-            chat.classList.add('expanded');
-        } else {
-            chat.classList.remove('expanded');
-        }
-    }
-
+    
+    // 자동 메시지 (시간대별)
+    setInterval(() => {
+      const now = new Date();
+      if(now.getHours() === 8 && now.getMinutes() === 0) {
+        showSpeechBubbleInChunks('주인님, 일어날 시간이에요!');
+      } else if(now.getHours() === 12 && now.getMinutes() === 0) {
+        showSpeechBubbleInChunks('식사하실 시간이에요!');
+      } else if(now.getHours() === 22 && now.getMinutes() === 0) {
+        showSpeechBubbleInChunks('주무실 시간이에요 zzzz');
+      }
+    }, 60000);
+    
+    // 애니메이션 루프 (3D 씬 업데이트)
     function animate() {
-        requestAnimationFrame(animate);
-        sun.rotation.y += 0.0002;
-        angleEarth += 0.002;
-        earth.position.x = earthOrbitRadius * Math.cos(angleEarth);
-        earth.position.z = earthOrbitRadius * Math.sin(angleEarth);
-
-        if (satelliteMode === "orbit") {
-            angleSatellite += satelliteSpeed;
-            satelliteOrbitRadius = 1.2 + 0.1 * Math.sin(angleSatellite);
-            satellite.position.x = earth.position.x + satelliteOrbitRadius * Math.cos(angleSatellite);
-            satellite.position.z = earth.position.z + satelliteOrbitRadius * Math.sin(angleSatellite);
-        } else if (satelliteMode === "toSun") {
-            if (satellite.position.distanceTo(sun.position) > 2.5) {
-                satellite.position.lerp(sun.position, 0.01);
-            } else {
-                if (satelliteMode !== "sun-station") {
-                    satelliteMode = "sun-station";
-                    autoSunInfo();
-                    sensorRotating = true;
-                    sendChat("📡 태양 근접 완료 - 촬영 중...");
-                    const sunRotationInfo = `
-☀️ 태양 자전 정보:
-- 적도 자전 주기: 약 25일
-- 극지방 자전 주기: 약 35일
-- 현재 시뮬레이션 속도: 자전은 시각적으로 0.0002 rad/프레임으로 표현`;
-                    sendChat(sunRotationInfo);
-                    toggleChatAlert(sunRotationInfo);
-                }
-            }
-        } else if (satelliteMode === "toEarth") {
-            if (satellite.position.distanceTo(earth.position) > 1) {
-                satellite.position.lerp(earth.position, 0.01);
-            } else {
-                if (satelliteMode !== "orbit") {
-                    satelliteMode = "orbit";
-                    autoEarthInfo();
-                    sensorRotating = false;
-                    sendChat("📡 지구 근접 완료 - 촬영 중...");
-                    const orbitProgress = ((angleEarth % (2 * Math.PI)) / (2 * Math.PI) * 100).toFixed(1);
-                    const earthSunDistance = earth.position.distanceTo(sun.position).toFixed(2);
-                    let orbitState = "";
-                    const angleDeg = (angleEarth % (2 * Math.PI)) * 180 / Math.PI;
-                    if (angleDeg < 10 || angleDeg > 350) orbitState = "근일점 근처";
-                    else if (angleDeg > 170 && angleDeg < 190) orbitState = "원일점 근처";
-                    else orbitState = "공전 중";
-                    const earthOrbitInfo = `
-🌍 지구 공전 정보:
-- 공전 주기: 약 365.25일
-- 현재 공전 진행률: ${orbitProgress}%
-- 공전 상태: ${orbitState}
-- 태양 거리: ${earthSunDistance} AU`;
-                    sendChat(earthOrbitInfo);
-                    toggleChatAlert(earthOrbitInfo);
-                }
-            }
+      requestAnimationFrame(animate);
+      
+      updateBubblePosition();
+      const now = new Date();
+      
+      const headWorldPos = new THREE.Vector3();
+      head.getWorldPosition(headWorldPos);
+      const orbitCenter = headWorldPos.clone().add(new THREE.Vector3(0, 2, 0));
+      
+      const totalMin = now.getHours() * 60 + now.getMinutes();
+      const angle = (totalMin / 1440) * Math.PI * 2;
+      const radius = 3;
+      
+      const sunPos = new THREE.Vector3(
+        orbitCenter.x + Math.cos(angle) * radius,
+        orbitCenter.y + Math.sin(angle) * radius,
+        orbitCenter.z
+      );
+      sun.position.copy(sunPos);
+      
+      const moonAngle = angle + Math.PI;
+      const moonPos = new THREE.Vector3(
+        orbitCenter.x + Math.cos(moonAngle) * radius,
+        orbitCenter.y + Math.sin(moonAngle) * radius,
+        orbitCenter.z
+      );
+      moon.position.copy(moonPos);
+      
+      const t = now.getHours() + now.getMinutes()/60;
+      let sunOpacity = 0, moonOpacity = 0;
+      if (t < 6) {
+        sunOpacity = 0; moonOpacity = 1;
+      } else if (t < 7) {
+        let factor = (t - 6);
+        sunOpacity = factor; moonOpacity = 1 - factor;
+      } else if (t < 17) {
+        sunOpacity = 1; moonOpacity = 0;
+      } else if (t < 18) {
+        let factor = (t - 17);
+        sunOpacity = 1 - factor; moonOpacity = factor;
+      } else {
+        sunOpacity = 0; moonOpacity = 1;
+      }
+      sun.material.opacity = sunOpacity;
+      moon.material.opacity = moonOpacity;
+      
+      const isDay = t >= 7 && t < 17;
+      scene.background = new THREE.Color(isDay ? 0x87CEEB : 0x000033);
+      stars.forEach(s => s.visible = !isDay);
+      fireflies.forEach(f => f.visible = !isDay);
+      
+      // 단일 가로등(캐릭터 옆)의 램프 불빛: 아침/낮에는 꺼지고, 밤에만 켜짐
+      characterStreetlight.traverse(child => {
+        if(child instanceof THREE.PointLight) {
+          child.intensity = isDay ? 0 : 1;
         }
-
-        if (sensorRotating) {
-            sensorRotation += 0.05;
-            panelL.rotation.z = sensorRotation;
-            panelR.rotation.z = sensorRotation;
-        } else {
-            panelL.rotation.z = 0;
-            panelR.rotation.z = 0;
+      });
+      characterLight.position.copy(characterGroup.position).add(new THREE.Vector3(0, 5, 0));
+      characterLight.intensity = isDay ? 0 : 1;
+      
+      characterGroup.position.y = -1;
+      characterGroup.rotation.x = 0;
+      
+      if (rainGroup.visible) {
+        const rainPoints = rainGroup.children[0];
+        const positions = rainPoints.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+          positions[i+1] -= 0.5;
+          if (positions[i+1] < 0) { positions[i+1] = Math.random() * 50 + 20; }
         }
-
-        updateSatelliteTime();
-
-        document.getElementById('orbit-value').innerText = satelliteOrbitRadius.toFixed(2);
-        document.getElementById('speed-value').innerText = (satelliteSpeed * 50).toFixed(2);
-
-        renderer.render(scene, camera);
+        rainPoints.geometry.attributes.position.needsUpdate = true;
+      }
+      
+      if (currentWeather.indexOf("번개") !== -1 || currentWeather.indexOf("뇌우") !== -1) {
+        if (Math.random() < 0.001) {
+          lightningLight.intensity = 5;
+          setTimeout(() => { lightningLight.intensity = 0; }, 100);
+        }
+      }
+      
+      updateHouseClouds();
+      
+      // 캐릭터 옆 단일 가로등 위치 업데이트 (캐릭터 기준 X offset 1)
+      characterStreetlight.position.set(
+        characterGroup.position.x + 1,
+        -2,
+        characterGroup.position.z
+      );
+      
+      renderer.render(scene, camera);
     }
-
-    const introText = document.getElementById('intro-text');
-    introText.addEventListener('animationend', () => {
-        introText.style.display = 'none';
-        const hudVersion = document.getElementById('hud-version');
-        hudVersion.textContent = 'A.S.H. v0.1';
-        document.getElementById('hud').style.opacity = 1;
-    });
-
     animate();
-
-    function sendChat(text) {
-        const messages = document.getElementById('messages');
-        messages.innerHTML += `<div>${text}</div>`;
-        messages.scrollTop = messages.scrollHeight;
+    
+    window.addEventListener('load', () => {
+      showSpeechBubbleInChunks('환영합니다 개인 AI비서입니다 무엇을 도와드릴까요');
+      initCalendar();
+    });
+    
+    /* ====================================
+       달력 UI (왼쪽 HUD 내)
+       - 2020년부터 2070년까지 선택 가능
+    ==================================== */
+    let currentYear, currentMonth;
+    function initCalendar() {
+      const now = new Date();
+      currentYear = now.getFullYear();
+      currentMonth = now.getMonth();
+      populateYearSelect();
+      renderCalendar(currentYear, currentMonth);
+      document.getElementById('prev-month').addEventListener('click', () => {
+        currentMonth--;
+        if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+        renderCalendar(currentYear, currentMonth);
+      });
+      document.getElementById('next-month').addEventListener('click', () => {
+        currentMonth++;
+        if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+        renderCalendar(currentYear, currentMonth);
+      });
+      document.getElementById('year-select').addEventListener('change', (e) => {
+        currentYear = parseInt(e.target.value);
+        renderCalendar(currentYear, currentMonth);
+      });
     }
-
-    function autoSunInfo() {
-        const sunInfo = `
-☀️ 태양 정보:
-- 11년 자기장 주기 및 플레어 주기 순환
-- 자전 주기: 적도 25일 / 극지방 35일
-- 질량: 태양계 질량의 99.86%
-- 핵융합: 수소를 헬륨으로 융합하여 에너지 발생
-- 광구 온도: 약 5,500°C
-- 플레어 & CME: 지구 자기장에 영향 가능
-- 지구 거리: 약 1억 4,960만 km
-- 수명: 약 100억년 중 절반 경과`;
-        sendChat(sunInfo);
-        document.getElementById('hud-answer').innerText = sunInfo;
-        switchVideo("sun");
+    function populateYearSelect() {
+      const yearSelect = document.getElementById('year-select');
+      yearSelect.innerHTML = "";
+      for (let y = 2020; y <= 2070; y++) {
+        const option = document.createElement('option');
+        option.value = y;
+        option.textContent = y;
+        if (y === currentYear) option.selected = true;
+        yearSelect.appendChild(option);
+      }
     }
-
-    function autoEarthInfo() {
-        const earthInfo = `
-🌍 지구 정보:
-- 반지름: 약 6,371 km
-- 자전 주기: 약 24시간
-- 공전 주기: 약 365일
-- 위성: 1개 (달)
-- 평균 온도: 약 15°C
-- 대기: 질소 78%, 산소 21%
-- 🌱 생명체 존재: 다양한 동식물 및 인간 서식
-- 대기 환경: 인간과 생명체가 호흡 가능한 산소 대기`;
-        sendChat(earthInfo);
-        document.getElementById('hud-answer').innerText = earthInfo;
-        switchVideo("earth");
+    function renderCalendar(year, month) {
+      const monthNames = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+      document.getElementById('month-year-label').textContent = `${year}년 ${monthNames[month]}`;
+      
+      const grid = document.getElementById('calendar-grid');
+      grid.innerHTML = "";
+      
+      // 요일 헤더 추가
+      const daysOfWeek = ["일","월","화","수","목","금","토"];
+      daysOfWeek.forEach(day => {
+        const th = document.createElement("div");
+        th.style.fontWeight = "bold";
+        th.style.textAlign = "center";
+        th.textContent = day;
+        grid.appendChild(th);
+      });
+      
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      // 빈 칸 추가
+      for (let i = 0; i < firstDay; i++) {
+        grid.appendChild(document.createElement("div"));
+      }
+      
+      // 날짜 셀 추가
+      for (let d = 1; d <= daysInMonth; d++) {
+        const cell = document.createElement("div");
+        cell.innerHTML = `<div class="day-number">${d}</div><div class="event" id="event-${year}-${month+1}-${d}"></div>`;
+        cell.addEventListener("click", () => {
+          const eventText = prompt(`${year}-${month+1}-${d} 일정 입력:`);
+          if (eventText) { addEventToDay(`${year}-${month+1}-${d}`, eventText); }
+        });
+        grid.appendChild(cell);
+      }
     }
-
-    function switchVideo(target) {
-        const video = document.getElementById('hud-video');
-        const source = document.getElementById('hud-source');
-        if (target === "sun") {
-            source.src = "https://vp.nyt.com/video/2020/09/15/88634_1_15SCI-SOLARCYCLE_wg_1080p.mp4";
-        } else if (target === "earth") {
-            source.src = "https://videos.pexels.com/video-files/5921369/5921369-hd_1920_1080_30fps.mp4";
+    function addEventToDay(dateStr, eventText) {
+      const eventDiv = document.getElementById(`event-${dateStr}`);
+      if (eventDiv) {
+        if (eventDiv.textContent) {
+          eventDiv.textContent += "; " + eventText;
+        } else {
+          eventDiv.textContent = eventText;
         }
-        video.load();
-        video.play();
+      }
     }
-</script>
+  </script>
 </body>
 </html>
